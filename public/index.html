@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<!-- design-intent: high-fidelity, night-workbench, warm-amber, iridescent-glass
+     高保真视觉原型：深夜工作台 · 暖琥珀。
+     深墨蓝夜色打底，右上暖琥珀台灯光晕，虹彩半透明玻璃泡泡漂浮，
+     软木塞玻璃罐陈列于木纹橱柜。Spectral 与 GSAP 经 jsDelivr 加载，均含 fallback。
+     所有异步仍为 mock 接口，数据结构与《03-前端设计文档》第 10 节真实接口一致。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#14111d">
+<title>灵感泡泡罐 · 高保真原型</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='g' cx='35%25' cy='30%25'%3E%3Cstop offset='0' stop-color='%23f2cf94'/%3E%3Cstop offset='1' stop-color='%23b8843e'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='13' fill='url(%23g)'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<!-- Spectral 衬线（英文/数字），fontsource 经 jsDelivr，失败自动回退 Georgia -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/spectral@5/300.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/spectral@5/400.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/spectral@5/500.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/spectral@5/600.css">
+<!-- GSAP，碰撞飞行与融合回弹；加载失败时脚本内回退原生 WAAPI -->
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<style>
+:root{
+  /* ── 深夜 · 木纹 · 暖琥珀 token（对齐设计文档第 2 节）── */
+  --night-1:#14111d;
+  --night-2:#1d1829;
+  --night-3:#282038;
+  --wood-deep:#3a2718;
+  --wood:#5b3d26;
+  --wood-light:#835a38;
+  --amber:#e8b86d;
+  --amber-soft:#f2cf94;
+  --amber-deep:#b8843e;
+  --paper:#efe3cc;
+  --ink:#ede7f6;
+  --ink-dim:#a89dc2;
+  --ink-faint:#6f6689;
+  /* ── 泡泡六色（仅泡泡与罐内点）── */
+  --c-lav:#b8a4e8;
+  --c-sky:#8ec9e8;
+  --c-pink:#e8a4c9;
+  --c-mint:#a4e8c9;
+  --c-honey:#e8d28e;
+  --c-coral:#e8a896;
+  /* ── 字体 ── */
+  --font-sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Source Han Sans SC",system-ui,sans-serif;
+  --font-serif:"Spectral",Georgia,"Times New Roman",serif;
+  /* ── 角色圆角 ── */
+  --r-card:19px;
+  --r-ctrl:12px;
+  --r-pill:20px;
+  --ease:cubic-bezier(.22,1,.36,1);
+  /* 取景框台面 */
+  --stage-1:#221c33;
+  --stage-2:#0e0c16;
+  --halo-1:rgba(232,184,109,.34);
+  --halo-2:rgba(122,99,196,.32);
+  --halo-a:.7;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:var(--night-1);color:var(--ink);overflow:hidden;
+  font-family:var(--font-sans);
+  font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+svg{display:block}
+.num{font-variant-numeric:tabular-nums}
+.ic{flex:none}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+[hidden]{display:none!important}
+
+/* 全局噪点颗粒（feTurbulence，opacity .05）*/
+body::after{content:"";position:fixed;inset:0;z-index:9999;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* ── 台面与手机取景框（深色金属壳）── */
+.stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  overflow:hidden;background:radial-gradient(130% 90% at 50% 8%,var(--stage-1),var(--stage-2) 72%)}
+.stage::before{content:"";position:absolute;inset:-18%;z-index:0;pointer-events:none;
+  opacity:var(--halo-a);filter:blur(90px);
+  background:
+    radial-gradient(38% 30% at 78% 12%,var(--halo-1),transparent 70%),
+    radial-gradient(42% 34% at 18% 78%,var(--halo-2),transparent 70%)}
+#app{position:relative;z-index:1;width:100%;height:100%;overflow:hidden;
+  background:linear-gradient(180deg,var(--night-2),var(--night-1) 78%)}
+@media(min-width:760px){
+  #app{width:390px;height:min(844px,86vh);border-radius:44px;
+    box-shadow:0 0 0 11px #1b1824,0 0 0 13px #3a3550,0 44px 100px rgba(0,0,0,.6),
+      inset 0 0 0 1px rgba(232,184,109,.12)}
+  .notch{position:absolute;top:9px;left:50%;transform:translateX(-50%);
+    width:112px;height:26px;border-radius:15px;background:#0a0810;z-index:60}
+}
+@media(max-width:759px){.notch{display:none}.stage::before{display:none}}
+
+/* ── 状态栏 ── */
+.statusbar{position:absolute;top:0;left:0;right:0;z-index:55;height:44px;padding:0 22px;
+  display:flex;align-items:center;justify-content:space-between;pointer-events:none;
+  font-family:var(--font-serif);font-size:13px;font-weight:500;color:var(--ink)}
+.sb-r{display:flex;align-items:center;gap:5px}
+.sb-r i{display:block;background:currentColor;border-radius:1px}
+.sb-r .sig{width:15px;height:10px;
+  clip-path:polygon(0 72%,18% 72%,18% 100%,0 100%,0 72%,27% 46%,45% 46%,45% 100%,27% 100%,
+    27% 46%,54% 22%,72% 22%,72% 100%,54% 100%,54% 22%,82% 0,100% 0,100% 100%,82% 100%)}
+.sb-r .wifi{width:14px;height:10px;
+  clip-path:polygon(50% 100%,32% 74%,68% 74%,50% 100%,50% 66%,20% 40%,28% 30%,72% 30%,80% 40%,
+    50% 66%,50% 24%,8% 12%,14% 2%,86% 2%,92% 12%)}
+.sb-r .bat{width:22px;height:11px;border-radius:3px;position:relative;
+  box-shadow:inset 0 0 0 1px currentColor}
+.sb-r .bat::before{content:"";position:absolute;inset:2px;width:64%;background:currentColor;border-radius:1px}
+
+/* ── 顶栏 ── */
+.topbar{position:absolute;top:0;left:0;right:0;z-index:50;
+  padding:calc(env(safe-area-inset-top) + 50px) 18px 10px;
+  display:flex;align-items:center;gap:10px;
+  background:linear-gradient(180deg,var(--night-2) 82%,rgba(29,24,41,0))}
+.brand{display:flex;align-items:center;gap:8px}
+.brand .logo{width:26px;height:26px;border-radius:50%;position:relative;
+  border:1px solid rgba(242,207,148,.55);
+  background:radial-gradient(circle at 34% 30%,var(--amber-soft),var(--amber) 46%,var(--amber-deep) 100%);
+  box-shadow:inset 0 2px 4px rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.45)}
+.brand b{font-size:16px;font-weight:600;letter-spacing:.02em}
+.brand small{display:block;font-family:var(--font-serif);font-size:10px;letter-spacing:.22em;
+  color:var(--ink-faint);font-weight:500}
+.stats{margin-left:auto;display:flex;gap:12px;text-align:center}
+.stats .n{font-family:var(--font-serif);font-size:17px;font-weight:500;line-height:1.1;color:var(--amber-soft)}
+.stats .l{font-size:10px;color:var(--ink-dim)}
+.iconbtn{width:38px;height:38px;border:1.5px solid rgba(255,255,255,.14);border-radius:50%;
+  display:grid;place-items:center;background:var(--night-3);color:var(--ink-dim)}
+
+/* ── 内容流 ── */
+#flow{height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+  padding:calc(env(safe-area-inset-top) + 108px) 18px 28px}
+#flow::-webkit-scrollbar{display:none}
+
+.sec-hd{display:flex;align-items:baseline;gap:8px;margin:6px 2px 10px}
+.sec-hd h2{font-size:15px;font-weight:500;letter-spacing:3px}
+.sec-hd .en{font-family:var(--font-serif);font-size:10px;letter-spacing:.14em;color:var(--ink-faint)}
+.sec-hd .sub{margin-left:auto;font-size:11px;color:var(--ink-faint)}
+
+/* ── 灵感桌面：深夜工作台面 ── */
+.desk{position:relative;height:350px;border-radius:var(--r-card);overflow:hidden;
+  background:
+    radial-gradient(120% 80% at 82% 6%,rgba(232,184,109,.13),transparent 52%),
+    radial-gradient(90% 70% at 12% 96%,rgba(122,99,196,.16),transparent 60%),
+    linear-gradient(160deg,var(--night-3),#1a1528 70%);
+  border:1px solid rgba(255,255,255,.07);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.06),inset 0 -26px 48px rgba(0,0,0,.4),
+    0 24px 60px rgba(0,0,0,.45)}
+
+/* ── 玻璃泡泡（signature element）── */
+.bubble{position:absolute;width:118px;height:118px;padding:14px 12px;border-radius:50%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;text-align:center;cursor:pointer;color:var(--ink);
+  background:
+    radial-gradient(circle at 33% 27%,rgba(255,255,255,.5) 0%,rgba(255,255,255,.12) 22%,rgba(255,255,255,0) 42%),
+    radial-gradient(circle at 68% 72%,color-mix(in srgb,var(--hue) 62%,transparent),
+      color-mix(in srgb,var(--hue) 26%,transparent) 58%,rgba(20,16,32,.34) 100%);
+  border:1px solid color-mix(in srgb,var(--hue) 55%,rgba(255,255,255,.25));
+  box-shadow:
+    inset 0 8px 16px rgba(255,255,255,.28),
+    inset -12px -16px 30px rgba(8,6,16,.5),
+    inset 0 -2px 6px color-mix(in srgb,var(--hue) 40%,transparent),
+    0 20px 38px rgba(0,0,0,.55),0 4px 14px rgba(0,0,0,.4);
+  animation:float 9s ease-in-out infinite alternate;
+  transition:transform .35s var(--ease),filter .35s var(--ease),box-shadow .35s var(--ease)}
+.bubble::before{content:"";position:absolute;top:9%;left:18%;width:46%;height:22%;
+  border-radius:50%;transform:rotate(-12deg);
+  background:linear-gradient(180deg,rgba(255,255,255,.42),rgba(255,255,255,.05))}
+.bubble::after{content:"";position:absolute;bottom:10%;left:26%;width:48%;height:14%;
+  border-radius:50%;opacity:.7;
+  background:radial-gradient(ellipse,color-mix(in srgb,var(--hue) 55%,transparent),transparent 75%)}
+.bubble:hover{animation-play-state:paused;transform:scale(1.07);filter:brightness(1.14)}
+.bubble .t{position:relative;z-index:2;font-size:13.5px;font-weight:600;line-height:1.3;
+  text-shadow:0 1px 4px rgba(0,0,0,.65)}
+.bubble .tag{position:relative;z-index:2;font-size:11px;color:var(--ink-dim)}
+.bubble.unclassified{border:1.5px dashed var(--amber)}
+.bubble.unclassified .uc{position:relative;z-index:2;font-size:9px;color:var(--amber);
+  font-weight:700;letter-spacing:.08em}
+@keyframes float{from{transform:translateY(-6px)}to{transform:translateY(8px)}}
+.bubble:nth-child(2){animation-duration:10.5s}
+.bubble:nth-child(3){animation-duration:8s}
+.bubble:nth-child(4){animation-duration:11.5s}
+.bubble:nth-child(5){animation-duration:9.5s}
+.bubble:nth-child(6){animation-duration:12s}
+.bubble:nth-child(7){animation-duration:10s}
+.bubble.pop-in{animation:popin .7s cubic-bezier(.22,1.4,.36,1) both}
+@keyframes popin{from{transform:scale(0)}to{transform:scale(1)}}
+
+/* 空状态 */
+.empty{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+  justify-content:center;gap:10px;text-align:center;padding:20px}
+.empty .eic{width:52px;height:52px;border:1.5px solid var(--ink-faint);border-radius:50%;
+  display:grid;place-items:center;color:var(--ink-faint)}
+.empty p{font-size:12.5px;color:var(--ink-dim)}
+.empty button{min-height:44px;padding:0 22px;border:1.5px solid rgba(242,207,148,.5);
+  border-radius:var(--r-pill);font-size:13px;font-weight:600;color:var(--amber-soft);
+  background:rgba(232,184,109,.08)}
+.desk.is-empty .bubble{display:none}
+.desk.is-empty .empty{display:flex}
+
+/* ── 橱柜：木纹横滑玻璃罐 ── */
+.cabinet{position:relative;display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;
+  scrollbar-width:none;margin:0 -18px;padding:22px 18px 18px;border-radius:var(--r-card);
+  background:
+    repeating-linear-gradient(92deg,rgba(0,0,0,.16) 0 2px,transparent 2px 9px),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.045) 0 1px,transparent 1px 14px),
+    linear-gradient(180deg,var(--wood-light),var(--wood) 45%,var(--wood-deep));
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.18),inset 0 -12px 26px rgba(0,0,0,.42),
+    0 24px 60px rgba(0,0,0,.45)}
+.cabinet::before{content:"";position:absolute;top:0;left:0;right:0;height:7px;
+  background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,0));
+  border-radius:var(--r-card) var(--r-card) 0 0}
+.cabinet::-webkit-scrollbar{display:none}
+.jar{position:relative;z-index:1;flex:0 0 108px;scroll-snap-align:start;cursor:pointer;text-align:center}
+.jar .jarbox{position:relative;width:84px;height:104px;margin:0 auto 6px;
+  filter:drop-shadow(0 10px 14px rgba(0,0,0,.45))}
+.jar .jarbox svg{width:100%;height:100%}
+.jar .jt{font-size:12.5px;font-weight:700;color:var(--paper)}
+.jar .jc{font-family:var(--font-serif);font-size:10px;color:rgba(239,227,204,.7)}
+.jar.pop-in .jarbox{animation:popin .7s cubic-bezier(.22,1.4,.36,1) both}
+.jar.flash .jarbox{animation:jarshake .6s var(--ease) 2}
+@keyframes jarshake{0%,100%{transform:rotate(0)}25%{transform:rotate(-7deg)}75%{transform:rotate(7deg)}}
+.jar:hover{transform:translateY(-7px);transition:transform .3s var(--ease)}
+.cabinet-empty{display:none;border:1.5px dashed rgba(255,255,255,.18);border-radius:var(--r-card);
+  padding:18px;text-align:center;font-size:12px;color:var(--ink-dim)}
+.cabinet.is-empty .cabinet-empty{display:block}
+.cabinet.is-empty .jar{display:none}
+
+/* ── 常驻录音按钮：琥珀径向 + 双环呼吸 ── */
+.recbtn{position:absolute;right:20px;bottom:26px;z-index:48;width:64px;height:64px;border-radius:50%;
+  border:1.5px solid rgba(255,255,255,.35);display:grid;place-items:center;color:#2a1c08;
+  background:radial-gradient(circle at 35% 30%,var(--amber-soft),var(--amber) 45%,var(--amber-deep) 100%);
+  box-shadow:0 10px 26px rgba(0,0,0,.5),0 0 30px rgba(232,184,109,.35);
+  animation:breathe 2.6s var(--ease) infinite}
+.recbtn::after{content:"";position:absolute;inset:-7px;border:1.5px solid rgba(232,184,109,.55);
+  border-radius:50%;opacity:.55;animation:ringpulse 2.6s var(--ease) infinite}
+@keyframes ringpulse{0%,100%{transform:scale(1);opacity:.55}50%{transform:scale(1.12);opacity:.25}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.recbtn[disabled]{animation:none;opacity:.5;cursor:not-allowed}
+.recbtn.recording{
+  background:radial-gradient(circle at 35% 30%,#f0b8a8,var(--c-coral) 50%,#b56a58 100%);
+  box-shadow:0 10px 26px rgba(0,0,0,.5),0 0 30px rgba(232,168,150,.4);color:#3a1610}
+.recbtn.recording::after{border-color:rgba(232,168,150,.6)}
+
+/* ── 遮罩与弹层 ── */
+.scrim{position:absolute;inset:0;z-index:80;background:rgba(10,8,18,.62);
+  opacity:0;pointer-events:none;backdrop-filter:blur(2px);transition:opacity .26s var(--ease)}
+.scrim.on{opacity:1;pointer-events:auto}
+.modal{position:absolute;left:0;right:0;bottom:0;z-index:82;
+  background:linear-gradient(180deg,#2e2548,var(--night-3) 42%,#211a33);
+  border-radius:20px 20px 0 0;border:1px solid rgba(232,184,109,.22);border-bottom:0;
+  padding:10px 18px calc(env(safe-area-inset-bottom) + 18px);max-height:80%;overflow-y:auto;
+  transform:translateY(100%);transition:transform .3s var(--ease);
+  box-shadow:0 -18px 50px rgba(0,0,0,.55),0 -6px 28px rgba(232,184,109,.14)}
+.modal.on{transform:none}
+.modal .grab{width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.18);margin:0 auto 12px}
+.modal .m-hd{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.modal .m-hd h3{font-size:16px;font-weight:600}
+.modal .m-hd .xbtn{margin-left:auto;width:36px;height:36px;border:1.5px solid rgba(255,255,255,.14);
+  border-radius:50%;display:grid;place-items:center;background:var(--night-3);color:var(--ink-dim)}
+.m-body{font-size:13.5px}
+.m-body .idea{border:1px solid rgba(255,255,255,.08);border-radius:var(--r-ctrl);padding:12px 14px;
+  background:var(--night-1);color:var(--ink);line-height:1.9}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0}
+.chips span{font-size:11.5px;padding:4px 11px;border:1.4px solid var(--ink-faint);
+  border-radius:var(--r-pill);color:var(--ink-dim)}
+.meta-row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-faint);
+  margin-bottom:12px}
+.meta-row .num{font-family:var(--font-serif)}
+.btnrow{display:flex;gap:10px;margin-top:6px}
+.btn{min-height:46px;padding:0 18px;border-radius:var(--r-ctrl);font-size:13.5px;font-weight:600;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1.5px solid transparent}
+.btn.flex{flex:1}
+.btn.primary{background:linear-gradient(180deg,var(--amber-soft),var(--amber) 55%,var(--amber-deep));
+  border-color:rgba(255,255,255,.25);color:#2a1c08;font-weight:700}
+.btn.ghost{background:rgba(255,255,255,.04);border-color:var(--ink-faint);color:var(--ink-dim)}
+.btn.burst{background:linear-gradient(180deg,#7a63c4,#5a44a0 60%,#42307c);
+  border-color:rgba(184,164,232,.4);color:#fff}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn .spin{width:15px;height:15px;border:1.8px solid currentColor;border-top-color:transparent;
+  border-radius:50%;animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* 原始口述折叠 */
+details.transcript{margin-top:10px;border:1.5px solid rgba(255,255,255,.08);border-radius:var(--r-ctrl);
+  background:var(--night-1);overflow:hidden}
+details.transcript summary{list-style:none;padding:10px 14px;font-size:12.5px;font-weight:600;
+  display:flex;align-items:center;gap:7px;cursor:pointer;min-height:44px;color:var(--ink-dim)}
+details.transcript summary::-webkit-details-marker{display:none}
+details.transcript .tx{padding:0 14px 12px;font-size:12.5px;color:var(--ink-faint);line-height:1.8}
+
+/* 候选卡片 */
+.cand{border:1.5px solid rgba(255,255,255,.09);border-radius:var(--r-card);padding:12px 14px;
+  margin-bottom:10px;background:rgba(20,17,29,.6)}
+.cand .c-hd{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.cand .c-hd .ct{font-size:13.5px;font-weight:700}
+.cand .score{margin-left:auto;font-family:var(--font-serif);font-size:22px;font-weight:500;
+  color:var(--amber)}
+.dim{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin:8px 0}
+.dim .d{display:flex;justify-content:space-between;font-size:11.5px;
+  border:1px solid rgba(255,255,255,.08);border-radius:var(--r-ctrl);padding:5px 9px;
+  background:rgba(255,255,255,.04)}
+.reason{font-size:12px;color:var(--ink-dim);line-height:1.7;border-top:1px dashed rgba(255,255,255,.12);
+  padding-top:8px}
+.reason b{color:var(--ink)}
+
+/* 无候选提示 */
+.no-cand{text-align:center;padding:14px 8px 6px}
+.no-cand .nic{width:56px;height:56px;border:1.5px solid var(--ink-faint);border-radius:50%;
+  display:grid;place-items:center;margin:0 auto 12px;color:var(--ink-dim)}
+.no-cand p{font-size:13.5px;line-height:1.8;color:var(--ink-dim);margin-bottom:14px}
+
+/* 居中卡片（录音/处理）*/
+.center-card{position:absolute;z-index:82;left:50%;top:50%;width:300px;
+  transform:translate(-50%,-50%) scale(.94);opacity:0;pointer-events:none;
+  background:linear-gradient(160deg,#2e2548,#241d38);
+  border:1.5px solid rgba(232,184,109,.2);border-radius:var(--r-card);padding:20px;
+  transition:opacity .28s var(--ease),transform .28s var(--ease);
+  box-shadow:0 24px 60px rgba(0,0,0,.6),0 0 30px rgba(232,184,109,.1)}
+.center-card.on{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+.center-card h3{font-size:15px;font-weight:600;text-align:center;margin-bottom:4px}
+.center-card .en{font-family:var(--font-serif);font-size:10px;letter-spacing:.2em;
+  color:var(--ink-faint);text-align:center;margin-bottom:14px}
+#wave{width:100%;height:64px;border:1px solid rgba(255,255,255,.1);border-radius:var(--r-ctrl);
+  background:var(--night-1)}
+.timer{text-align:center;font-family:var(--font-serif);font-size:30px;font-weight:300;
+  margin:12px 0 6px;color:var(--amber-soft)}
+.live{display:flex;align-items:center;justify-content:center;gap:7px;font-size:11.5px;
+  color:var(--ink-dim);margin-bottom:14px}
+.live .dot{width:8px;height:8px;border-radius:50%;background:var(--amber)}
+.paused-flag{font-size:11.5px;color:var(--amber);font-weight:700;text-align:center;margin-bottom:12px}
+/* 步骤条 */
+.steps{margin:6px 0 14px}
+.step{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+.step:last-child{border-bottom:0}
+.step .si{width:24px;height:24px;border:1.5px solid var(--ink-faint);border-radius:50%;
+  display:grid;place-items:center;font-family:var(--font-serif);font-size:11px;
+  color:var(--ink-faint);flex:none}
+.step .sl{font-size:13px;font-weight:600}
+.step .sp{margin-left:auto;font-size:11.5px;color:var(--ink-faint)}
+.step.active .si{border-color:var(--amber);color:var(--amber)}
+.step.active .si .spinner{width:12px;height:12px;border:1.6px solid rgba(232,184,109,.35);
+  border-top-color:var(--amber);border-radius:50%;animation:rot .8s linear infinite}
+.step.done .si{border-color:var(--amber);background:var(--amber);color:#2a1c08}
+.step.fail .si{border-color:var(--c-coral);color:var(--c-coral)}
+.progressbar{height:8px;border:1px solid rgba(255,255,255,.1);border-radius:var(--r-pill);
+  overflow:hidden;margin-top:4px}
+.progressbar i{display:block;height:100%;width:0;
+  background:linear-gradient(90deg,var(--amber-deep),var(--amber-soft));transition:width .3s var(--ease)}
+
+/* 错误态 */
+.error-card{text-align:center;padding:6px 4px}
+.error-card .eic{width:52px;height:52px;border:1.5px solid var(--c-coral);border-radius:50%;
+  display:grid;place-items:center;margin:0 auto 12px;color:var(--c-coral)}
+.error-card .reason-t{font-size:13.5px;font-weight:700;margin-bottom:6px}
+.error-card .reason-s{font-size:12px;color:var(--ink-dim);margin-bottom:14px;line-height:1.7}
+.manual-input{width:100%;min-height:96px;border:1.5px solid rgba(255,255,255,.14);
+  border-radius:var(--r-ctrl);padding:10px 12px;font:inherit;resize:vertical;
+  background:var(--night-1);color:var(--paper);margin-bottom:12px;line-height:1.8}
+.manual-input::placeholder{color:var(--ink-faint)}
+
+/* 罐子详情内灵感列表 */
+.jar-detail-hero{text-align:center;margin-bottom:14px}
+.jar-detail-hero .jarbox{width:96px;height:118px;margin:0 auto 8px}
+.jar-detail-hero .jarbox svg{width:100%;height:100%}
+.jar-detail-hero h3{font-size:17px;font-weight:700}
+.jar-detail-hero .jc{font-family:var(--font-serif);font-size:11px;color:var(--ink-faint);
+  letter-spacing:.1em}
+.spark-list .sp{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+.spark-list .sp:last-child{border-bottom:0}
+.spark-list .pd{width:10px;height:10px;border:1.4px solid rgba(255,255,255,.25);border-radius:50%;
+  margin-top:5px;flex:none}
+.spark-list .sp:nth-child(6n+1) .pd{background:var(--c-lav)}
+.spark-list .sp:nth-child(6n+2) .pd{background:var(--c-sky)}
+.spark-list .sp:nth-child(6n+3) .pd{background:var(--c-pink)}
+.spark-list .sp:nth-child(6n+4) .pd{background:var(--c-mint)}
+.spark-list .sp:nth-child(6n+5) .pd{background:var(--c-honey)}
+.spark-list .sp:nth-child(6n+6) .pd{background:var(--c-coral)}
+.spark-list .st{font-size:13px;font-weight:600}
+.spark-list .ss{font-size:11.5px;color:var(--ink-faint);line-height:1.6}
+.spark-list button.sp{width:100%;background:none;border:0;text-align:left;color:inherit;
+  font:inherit;cursor:pointer;border-radius:10px}
+.spark-list button.sp:hover{background:rgba(255,255,255,.05)}
+.spark-list button.sp:hover .st{color:var(--c-lav)}
+
+/* ── 爆发动画层（全屏，在取景框内）── */
+.burst-layer{position:absolute;inset:0;z-index:95;display:none;
+  background:radial-gradient(120% 90% at 50% 40%,#241d38,var(--night-1) 80%)}
+.burst-layer.on{display:block}
+#burstCanvas{position:absolute;inset:0;width:100%;height:100%}
+.burst-cap{position:absolute;top:calc(env(safe-area-inset-top) + 22px);left:0;right:0;
+  text-align:center;font-size:13px;font-weight:700;letter-spacing:.2em;color:var(--amber-soft)}
+.burst-result{position:absolute;left:50%;top:50%;width:150px;min-height:150px;padding:16px;
+  transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  text-align:center;border-radius:50%;color:var(--ink);
+  background:
+    radial-gradient(circle at 33% 27%,rgba(255,255,255,.5),rgba(255,255,255,0) 42%),
+    radial-gradient(circle at 66% 72%,rgba(184,164,232,.62),rgba(90,68,160,.3) 58%,rgba(20,16,32,.4));
+  border:1px solid rgba(184,164,232,.55);
+  box-shadow:inset 0 8px 16px rgba(255,255,255,.28),inset -12px -16px 30px rgba(8,6,16,.5),
+    0 24px 50px rgba(0,0,0,.55)}
+.burst-result.show{animation:popin .8s cubic-bezier(.22,1.4,.36,1) both}
+.burst-result .t{font-size:13px;font-weight:700;line-height:1.3;text-shadow:0 1px 4px rgba(0,0,0,.6)}
+.burst-result .s{font-size:10.5px;color:var(--ink-dim)}
+
+/* ── Toast：深色胶囊 + 琥珀描边 ── */
+.toast{position:absolute;left:50%;bottom:96px;z-index:120;transform:translate(-50%,14px);opacity:0;
+  pointer-events:none;max-width:82%;padding:11px 18px;border-radius:var(--r-pill);
+  background:#100d18;color:var(--paper);font-size:12.5px;line-height:1.5;
+  border:1.5px solid rgba(232,184,109,.45);
+  transition:opacity .28s var(--ease),transform .28s var(--ease)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+  .bubble{position:absolute}
+}
+</style>
+</head>
+<body>
+<div class="stage"><div id="app">
+  <div class="notch"></div>
+
+  <div class="statusbar">
+    <span>17:18</span>
+    <span class="sb-r"><i class="sig"></i><i class="wifi"></i><i class="bat"></i></span>
+  </div>
+
+  <div class="topbar">
+    <div class="brand">
+      <span class="logo"></span>
+      <div><b>灵感泡泡罐</b><small>BUBBLE JAR</small></div>
+    </div>
+    <div class="stats">
+      <div><div class="n num" id="stDesk">7</div><div class="l">漂浮灵感</div></div>
+      <div><div class="n num" id="stJar">3</div><div class="l">收藏罐</div></div>
+    </div>
+    <button class="iconbtn" id="btnSound" aria-label="音效开关" aria-pressed="true">
+      <svg class="ic" width="19" height="19" viewBox="0 0 256 256" fill="currentColor" id="soundIc"></svg>
+    </button>
+  </div>
+
+  <div id="flow">
+    <div class="sec-hd">
+      <h2>灵感桌面</h2><span class="en">DESK</span>
+      <span class="sub">碎片想法经 AI 梳理后凝成泡泡</span>
+    </div>
+    <div class="desk" id="desk">
+      <!-- 泡泡由 JS 渲染 -->
+      <div class="empty">
+        <span class="eic">
+          <svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor"><path d="M128,176a48.05,48.05,0,0,0,48-48V64a48,48,0,0,0-96,0v64A48.05,48.05,0,0,0,128,176ZM96,64a32,32,0,0,1,64,0v64a32,32,0,0,1-64,0Zm40,143.6V240a8,8,0,0,1-16,0V207.6A80.11,80.11,0,0,1,48,128a8,8,0,0,1,16,0,64,64,0,0,0,128,0,8,8,0,0,1,16,0A80.11,80.11,0,0,1,136,207.6Z"/></svg>
+        </span>
+        <p>桌面还没有灵感<br>点击下方按钮，说出你的第一个想法</p>
+        <button type="button" id="emptyRec">开始录音</button>
+      </div>
+    </div>
+
+    <div class="sec-hd" style="margin-top:20px">
+      <h2>灵感橱柜</h2><span class="en">COLLECTION</span>
+      <span class="sub">归档泡泡按 AI 主题装罐</span>
+    </div>
+    <div class="cabinet" id="cabinet"><!-- 罐子由 JS 渲染 --></div>
+    <div class="cabinet-empty" id="cabinetEmpty">橱柜还是空的，归档第一个灵感后会自动装罐</div>
+  </div>
+
+  <button class="recbtn" id="recbtn" aria-label="开始录音">
+    <svg width="26" height="26" viewBox="0 0 256 256" fill="currentColor"><path d="M128,176a48.05,48.05,0,0,0,48-48V64a48,48,0,0,0-96,0v64A48.05,48.05,0,0,0,128,176ZM96,64a32,32,0,0,1,64,0v64a32,32,0,0,1-64,0Zm40,143.6V240a8,8,0,0,1-16,0V207.6A80.11,80.11,0,0,1,48,128a8,8,0,0,1,16,0,64,64,0,0,0,128,0,8,8,0,0,1,16,0A80.11,80.11,0,0,1,136,207.6Z"/></svg>
+  </button>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- 遮罩 -->
+  <div class="scrim" id="scrim"></div>
+
+  <!-- 底部半屏弹层 -->
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="详情面板">
+    <div class="grab"></div>
+    <div id="modalContent"></div>
+  </div>
+
+  <!-- 居中卡片：录音 -->
+  <div class="center-card" id="recCard" role="dialog" aria-modal="true" aria-label="录音面板">
+    <h3>正在捕捉灵感</h3>
+    <div class="en">RECORDING</div>
+    <canvas id="wave" width="560" height="128"></canvas>
+    <div class="timer num" id="recTimer">00:00</div>
+    <div class="live" id="liveRow"><span class="dot"></span>LIVE · 断断续续也没关系</div>
+    <div class="paused-flag" id="pausedFlag" hidden>已暂停 · 点击继续</div>
+    <div class="btnrow">
+      <button class="btn ghost flex" id="btnPause" type="button">
+        <svg class="ic" width="17" height="17" viewBox="0 0 256 256" fill="currentColor" id="pauseIc"></svg>
+        <span id="pauseTxt">暂停</span>
+      </button>
+      <button class="btn primary flex" id="btnFinish" type="button">结束，交给 AI 梳理</button>
+    </div>
+  </div>
+
+  <!-- 居中卡片：处理流程 -->
+  <div class="center-card" id="procCard" role="dialog" aria-modal="true" aria-label="处理流程">
+    <h3>灵感处理中</h3>
+    <div class="en">PROCESSING</div>
+    <div class="steps" id="steps">
+      <div class="step" data-step="upload">
+        <span class="si"><span class="num">1</span></span>
+        <span class="sl">音频上传</span><span class="sp" id="spUpload">等待中</span>
+      </div>
+      <div class="step" data-step="transcribe">
+        <span class="si"><span class="num">2</span></span>
+        <span class="sl">语音转写</span><span class="sp" id="spTrans">等待中</span>
+      </div>
+      <div class="step" data-step="summary">
+        <span class="si"><span class="num">3</span></span>
+        <span class="sl">大模型总结</span><span class="sp" id="spSum">等待中</span>
+      </div>
+    </div>
+    <div class="progressbar"><i id="procBar"></i></div>
+  </div>
+
+  <!-- 爆发动画层 -->
+  <div class="burst-layer" id="burstLayer">
+    <canvas id="burstCanvas"></canvas>
+    <div class="burst-cap" id="burstCap">灵感爆发中</div>
+    <div class="burst-result" id="burstResult">
+      <div class="t" id="brTitle"></div>
+      <div class="s" id="brSub"></div>
+    </div>
+  </div>
+</div></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   1. Mock 数据（结构对齐需求文档第 8 节实体）
+   ══════════════════════════════════════════════════════════════ */
+const ICONS = {
+  pause:'<path d="M200,32H160a16,16,0,0,0-16,16V208a16,16,0,0,0,16,16h40a16,16,0,0,0,16-16V48A16,16,0,0,0,200,32Zm0,176H160V48h40ZM96,32H56a16,16,0,0,0-16,16v208a16,16,0,0,0,16,16h40a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Zm0,176H56V48h40Z"/>',
+  play:'<path d="M232.4,114.49,88.32,26.35a16,16,0,0,0-16.2-.3A15.86,15.86,0,0,0,64,39.87V216.13A15.94,15.94,0,0,0,80,232a16.07,16.07,0,0,0,8.36-2.35L232.4,141.51a15.81,15.81,0,0,0,0-27ZM80,215.94V40l143.83,88Z"/>',
+  x:'<path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128,55.03,55.03a8,8,0,0,1-11.32,11.32Z"/>',
+  warn:'<path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12,12,12,0,0,1,12,12Z"/>',
+  retry:'<path d="M240,56v48a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16H211.4L184.81,71.64l-.25-.24a80,80,0,1,0-1.67,114.78,8,8,0,0,1,11,11.63A95.44,95.44,0,0,1,128,224h-1.32A96,96,0,1,1,195.75,60L224,85.8V56a8,8,0,1,1,16,0Z"/>',
+  pencil:'<path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/>',
+  pkg:'<path d="M223.68,66.15,135.68,18a15.88,15.88,0,0,0-15.36,0l-88,48.17a16,16,0,0,0-8.32,14v95.64a16,16,0,0,0,8.32,14l88,48.17a15.88,15.88,0,0,0,15.36,0l88,48.17a16,16,0,0,0,8.32-14V80.18A16,16,0,0,0,223.68,66.15ZM128,32l80.34,44-29.77,16.3-80.35-44ZM128,120,47.66,76l33.9-18.56,80.34,44ZM40,90l80,43.78v85.79L40,175.82Zm176,85.78h0l-80,43.79V133.82l32-17.51V152a8,8,0,0,0,16,0V107.55L216,90v85.77Z"/>',
+  bolt:'<path d="M215.79,118.17a8,8,0,0,0-5-5.66L153.18,90.9l14.66-73.33a8,8,0,0,0-13.69-7l-112,120a8,8,0,0,0,3,13l57.63,21.61L88.16,238.43a8,8,0,0,0,13.69,7l112,120a8,8,0,0,0,215.79,118.17ZM109.37,214l10.47-52.38a8,8,0,0,0-5-9.06L62,132.71l84.62-90.66L136.16,94.43a8,8,0,0,0,5,9.06l52.8,19.8Z"/>',
+  quotes:'<path d="M100,56H40A16,16,0,0,0,24,72v64a16,16,0,0,0,16,16h60v8a32,32,0,0,1-32,32,8,8,0,0,0,0,16,48.05,48.05,0,0,0,48-48V72A16,16,0,0,0,100,56Zm0,80H40V72h60ZM216,56H156a16,16,0,0,0-16,16v64a16,16,0,0,0,16,16h60v8a32,32,0,0,1-32,32,8,8,0,0,0,0,16,48.05,48.05,0,0,0,48-48V72A16,16,0,0,0,216,56Zm0,80H156V72h60Z"/>',
+  speakerHi:'<path d="M155.51,24.81a8,8,0,0,0-8.42.88L77.25,80H32A16,16,0,0,0,16,96v64a16,16,0,0,0,16,16H77.25l69.84,54.31A8,8,0,0,0,160,224V32A8,8,0,0,0,155.51,24.81ZM32,96H72v64H32ZM144,207.64,88,164.09V91.91l56-43.55Zm54-106.08a40,40,0,0,1,0,52.88,8,8,0,0,1-12-10.58,24,24,0,0,0,0-31.72,8,8,0,0,1,12-10.58ZM248,128a79.9,79.9,0,0,1-20.37,53.34,8,8,0,0,1-11.92-10.67,64,64,0,0,0,0-85.33,8,8,1,1,11.92-10.67A79.83,79.83,0,0,1,248,128Z"/>',
+  speakerX:'<path d="M155.51,24.81a8,8,0,0,0-8.42.88L77.25,80H32A16,16,0,0,0,16,96v64a16,16,0,0,0,16,16H77.25l69.84,54.31A8,8,0,0,0,160,224V32A8,8,0,0,0,155.51,24.81ZM32,96H72v64H32ZM144,207.64,88,164.09V91.91l56-43.55Zm101.66-61.3a8,8,0,0,1-11.32,11.32L216,139.31l-18.34,18.35a8,8,0,0,1-11.32-11.32L204.69,128l-18.35-18.35a8,8,0,0,1,11.32-11.32L216,116.69l18.34-18.35a8,8,0,0,1,11.32,11.32L227.31,128Z"/>',
+  mic:'<path d="M128,176a48.05,48.05,0,0,0,48-48V64a48,48,0,0,0-96,0v64A48.05,48.05,0,0,0,128,176ZM96,64a32,32,0,0,1,64,0v64a32,32,0,0,1-64,0Zm40,143.6V240a8,8,0,0,1-16,0V207.6A80.11,80.11,0,0,1,48,128a8,8,0,0,1,16,0,64,64,0,0,0,128,0,8,8,0,0,1,16,0A80.11,80.11,0,0,1,136,207.6Z"/>'
+};
+function svg(ic,size){return `<svg class="ic" width="${size||18}" height="${size||18}" viewBox="0 0 256 256" fill="currentColor">${ICONS[ic]}</svg>`;}
+
+/* 数据全部从后端加载，初始为空数组 */
+let bubbles = [];
+let jars = [];
+
+/* ══════════════════════════════════════════════════════════════
+   2. 通用工具
+   ══════════════════════════════════════════════════════════════ */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+const hasGSAP=()=>typeof window.gsap!=='undefined';
+let soundOn=true;
+
+/* 泡泡六色（CSS 变量名与 hex 双份，供 DOM 与 SVG 分别使用）*/
+const HUE_VARS=['--c-lav','--c-sky','--c-pink','--c-mint','--c-honey','--c-coral'];
+const HUE_HEX=['#b8a4e8','#8ec9e8','#e8a4c9','#a4e8c9','#e8d28e','#e8a896'];
+
+const toastEl=$('#toast');let toastT;
+function toast(msg){
+  toastEl.textContent=msg;toastEl.classList.add('on');
+  clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove('on'),1700);
+}
+
+/* 弹层焦点管理 */
+let lastFocused=null;
+function trapFocus(container){
+  const f=$$('button,[href],input,textarea,summary,canvas',container)
+    .filter(e=>e.offsetParent!==null&&!e.disabled);
+  if(!f.length)return;
+  f[0].focus();
+  container.addEventListener('keydown',function onKey(e){
+    if(e.key!=='Tab')return;
+    const first=f[0],last=f[f.length-1];
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+  });
+}
+function openScrim(on){$('#scrim').classList.toggle('on',on);}
+
+/* ══════════════════════════════════════════════════════════════
+   3. 渲染：桌面泡泡 + 橱柜
+   ══════════════════════════════════════════════════════════════ */
+let jarUid=0;
+function jarSVG(count=0,label=''){
+  const gid='jg'+(jarUid++);
+  const n=Math.min(Math.max(count,3),7);
+  const dotPos=[[42,92],[55,96],[48,84],[62,86],[38,85],[54,78],[46,98]];
+  const dots=[];
+  for(let i=0;i<n;i++){
+    dots.push(`<circle cx="${dotPos[i][0]}" cy="${dotPos[i][1]}" r="3.6" fill="${HUE_HEX[i%6]}" opacity=".85"/>`);
+  }
+  const txt=(label||'').slice(0,4);
+  return `<svg viewBox="0 0 100 124" fill="none" aria-hidden="true">
+    <defs>
+      <linearGradient id="${gid}glass" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#ffffff" stop-opacity=".22"/>
+        <stop offset=".5" stop-color="#ffffff" stop-opacity=".06"/>
+        <stop offset="1" stop-color="#b8a4e8" stop-opacity=".14"/>
+      </linearGradient>
+      <linearGradient id="${gid}cork" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#835a38"/>
+        <stop offset="1" stop-color="#3a2718"/>
+      </linearGradient>
+      <linearGradient id="${gid}paper" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f5ecd9"/>
+        <stop offset="1" stop-color="#e3d3b4"/>
+      </linearGradient>
+    </defs>
+    <rect x="38" y="4" width="24" height="13" rx="2.5" fill="url(#${gid}cork)"/>
+    <path d="M30 20 H70 L76 34 V112 a6 6 0 0 1-6 6 H30 a6 6 0 0 1-6-6 V34 Z"
+      fill="url(#${gid}glass)" stroke="rgba(237,231,246,.35)" stroke-width="1.4"/>
+    ${dots.join('')}
+    <path d="M66 36 V104" stroke="#ffffff" stroke-opacity=".35" stroke-width="3" stroke-linecap="round"/>
+    <path d="M40 40 V96" stroke="#ffffff" stroke-opacity=".18" stroke-width="1.4"/>
+    <g transform="rotate(-2.5 50 70)">
+      <rect x="31" y="58" width="38" height="24" rx="2.5" fill="url(#${gid}paper)"
+        stroke="#b8843e" stroke-width=".8"/>
+      <text x="50" y="74" text-anchor="middle" font-family="Spectral,Georgia,serif"
+        font-size="10.5" fill="#3a2718" font-weight="600">${txt}</text>
+    </g>
+  </svg>`;
+}
+function renderDesk(){
+  const desk=$('#desk');
+  /* 清掉旧泡泡，保留 .empty */
+  $$('.bubble',desk).forEach(b=>b.remove());
+  const list=bubbles.filter(b=>b.status==='desk');
+  list.forEach((b,i)=>{
+    const el=document.createElement('button');
+    el.type='button';el.className='bubble'+(b.unclassified?' unclassified':'');
+    el.style.setProperty('--hue','var('+HUE_VARS[i%6]+')');
+    const size=118+(i%3)*10;
+    el.style.width=size+'px';el.style.height=size+'px';
+    el.style.left=b.x+'%';el.style.top=b.y+'%';el.dataset.id=b.id;
+    el.setAttribute('aria-label','查看灵感 '+b.title);
+    el.innerHTML=`<span class="t">${b.title}</span>`+
+      (b.unclassified?'<span class="uc">未分类</span>':`<span class="tag">${b.tags[0]}</span>`);
+    el.onclick=()=>openDetail(b.id);
+    desk.appendChild(el);
+  });
+  desk.classList.toggle('is-empty',list.length===0);
+  $('#stDesk').textContent=list.length;
+}
+function renderCabinet(){
+  const cab=$('#cabinet');
+  cab.innerHTML='';
+  jars.forEach(j=>{
+    const count=j.count||0;
+    const el=document.createElement('div');
+    el.className='jar';el.dataset.id=j.id;el.setAttribute('role','button');
+    el.setAttribute('aria-label','查看罐子 '+j.theme);
+    el.innerHTML=`<div class="jarbox">${jarSVG(count,j.theme)}</div>
+      <div class="jt">${j.theme}</div>
+      <div class="jc num">${count} sparks collected</div>`;
+    el.onclick=()=>openJar(j.id);
+    cab.appendChild(el);
+  });
+  $('#cabinet').classList.toggle('is-empty',jars.length===0);
+  $('#cabinetEmpty').style.display=jars.length===0?'block':'none';
+  $('#stJar').textContent=jars.length;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   4. 录音面板（含暂停/继续，补齐 FR-01 缺口）
+   ══════════════════════════════════════════════════════════════ */
+const waveCanvas=$('#wave'),wctx=waveCanvas.getContext('2d');
+let recState='idle',recSeconds=0,recTick,waveBars=[];
+let mediaStream=null,mediaRecorder=null,audioChunks=[];
+let lastAudioBlob=null,lastAudioDuration=0,pendingProcess=false;
+function sizeWave(){
+  const dpr=devicePixelRatio||1;
+  const w=waveCanvas.clientWidth,h=waveCanvas.clientHeight;
+  waveCanvas.width=w*dpr;waveCanvas.height=h*dpr;wctx.setTransform(dpr,0,0,dpr,0,0);
+  waveBars=Array.from({length:28},()=>Math.random()*.4+.15);
+}
+function drawWave(){
+  const w=waveCanvas.clientWidth,h=waveCanvas.clientHeight;
+  wctx.clearRect(0,0,w,h);
+  const bw=w/waveBars.length;
+  waveBars.forEach((v,i)=>{
+    const bh=v*h*.9;
+    wctx.fillStyle=i%4===0?'#f2cf94':'#e8b86d';
+    wctx.fillRect(i*bw+bw*.28,h/2-bh/2,bw*.44,bh);
+  });
+}
+let waveRAF;
+function waveLoop(){
+  if(recState==='recording'){
+    waveBars=waveBars.map(v=>{
+      let n=v+(Math.random()-.5)*.34;
+      return Math.max(.12,Math.min(.95,n));
+    });
+  }
+  drawWave();
+  if(!reducedMotion())waveRAF=requestAnimationFrame(waveLoop);
+}
+function fmtTime(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
+
+/* 优先选方舟可直接识别的 mp4(AAC)，不支持时回退 webm(opus) */
+function pickRecorderMime(){
+  const candidates=[
+    'audio/mp4;codecs=mp4a.40.2',
+    'audio/mp4',
+    'audio/webm;codecs=opus',
+    'audio/webm'
+  ];
+  return candidates.find(m=>MediaRecorder.isTypeSupported(m))||'';
+}
+
+async function startRecording(){
+  lastFocused=document.activeElement;
+  let stream;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}
+    });
+  }catch(err){
+    openError('permission');
+    return;
+  }
+  mediaStream=stream;audioChunks=[];
+  const mime=pickRecorderMime();
+  mediaRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+  mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size>0)audioChunks.push(e.data);};
+  mediaRecorder.onstop=()=>{
+    lastAudioBlob=new Blob(audioChunks,{type:mediaRecorder.mimeType||mime});
+    mediaStream.getTracks().forEach(t=>t.stop());
+    if(pendingProcess){pendingProcess=false;runProcess();}
+  };
+  mediaRecorder.start(250);
+
+  recState='recording';recSeconds=0;
+  sizeWave();
+  $('#recCard').classList.add('on');openScrim(true);
+  $('#recbtn').classList.add('recording');$('#recbtn').disabled=true;
+  setPauseUI(false);
+  if(reducedMotion()){drawWave();}
+  else{cancelAnimationFrame(waveRAF);waveLoop();}
+  recTick=setInterval(()=>{if(recState==='recording'){recSeconds++;$('#recTimer').textContent=fmtTime(recSeconds);}},1000);
+}
+function setPauseUI(paused){
+  $('#pauseIc').outerHTML=svg(paused?'play':'pause',17).replace('class="ic"','class="ic" id="pauseIc"');
+  $('#pausedFlag').hidden=!paused;
+  $('#liveRow').hidden=paused;
+  $('#pauseTxt').textContent=paused?'继续':'暂停';
+}
+$('#btnPause').onclick=()=>{
+  if(recState==='recording'){mediaRecorder.pause();recState='paused';setPauseUI(true);}
+  else if(recState==='paused'){mediaRecorder.resume();recState='recording';setPauseUI(false);}
+};
+$('#btnFinish').onclick=()=>{
+  if(recSeconds<1){toast('再多说几秒吧');return;}
+  clearInterval(recTick);cancelAnimationFrame(waveRAF);
+  $('#recCard').classList.remove('on');
+  $('#recbtn').classList.remove('recording');
+  pendingProcess=true;
+  mediaRecorder.stop();
+};
+
+/* ══════════════════════════════════════════════════════════════
+   5. 处理流程面板（不可遮罩关闭）
+   ══════════════════════════════════════════════════════════════ */
+function setStep(name,state,label){
+  const el=$(`.step[data-step="${name}"]`);
+  el.classList.remove('active','done','fail');
+  const si=el.querySelector('.si');
+  if(state==='active'){el.classList.add('active');si.innerHTML='<span class="spinner"></span>';}
+  else if(state==='done'){el.classList.add('done');si.textContent='✓';}
+  else if(state==='fail'){el.classList.add('fail');si.textContent='!';}
+  else{el.classList.remove('active','done','fail');si.innerHTML=`<span class="num">${name==='upload'?1:name==='transcribe'?2:3}</span>`;}
+  if(label)el.querySelector('.sp').textContent=label;
+}
+/* 唯一网络出口：提交音频并解析 SSE */
+const STAGE_MAP={uploading:'upload',transcribing:'transcribe',summarizing:'summary'};
+const API={
+  async submitAudio(blob,duration,handlers){
+    const fd=new FormData();
+    fd.append('audio',blob,'idea.webm');
+    fd.append('duration',String(duration));
+    const resp=await fetch('/api/ideas/from-audio',{method:'POST',body:fd});
+    if(!resp.ok||!resp.body){
+      let message='音频上传失败';
+      try{const j=await resp.json();if(j.message)message=j.message;}catch{}
+      handlers.onError({stage:'uploading',code:'UPLOAD_FAILED',message});
+      return;
+    }
+    const reader=resp.body.getReader();
+    const decoder=new TextDecoder();
+    let buffer='';
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      buffer+=decoder.decode(value,{stream:true});
+      let sep;
+      while((sep=buffer.indexOf('\n\n'))>=0){
+        const frame=buffer.slice(0,sep);
+        buffer=buffer.slice(sep+2);
+        dispatchFrame(frame,handlers);
+      }
+    }
+  }
+};
+function dispatchFrame(frame,handlers){
+  let event='message';const dataLines=[];
+  for(const line of frame.split('\n')){
+    if(line.startsWith('event:'))event=line.slice(6).trim();
+    else if(line.startsWith('data:'))dataLines.push(line.slice(5).trim());
+  }
+  const payload=JSON.parse(dataLines.join('\n'));
+  if(event==='stage')handlers.onStage(payload);
+  else if(event==='done')handlers.onDone(payload);
+  else if(event==='error')handlers.onError(payload);
+}
+
+async function runProcess(){
+  $('#procCard').classList.add('on');
+  $('#procBar').style.width='0%';
+  ['upload','transcribe','summary'].forEach(s=>setStep(s,'idle'));
+
+  try{
+    await API.submitAudio(lastAudioBlob,lastAudioDuration,{
+      onStage(p){
+        if(p.stage==='uploading'){
+          setStep('upload','active','上传中');
+          $('#procBar').style.width=(p.progress||0)+'%';
+        }else if(p.stage==='transcribing'){
+          setStep('upload','done','已完成');
+          setStep('transcribe','active','转写中');
+          $('#procBar').style.width='50%';
+        }else if(p.stage==='summarizing'){
+          setStep('transcribe','done','已完成');
+          setStep('summary','active','总结中');
+          $('#procBar').style.width='75%';
+        }
+      },
+      async onDone({bubble}){
+        setStep('summary','done','已完成');
+        $('#procBar').style.width='100%';
+        await wait(reducedMotion()?40:300);
+        bubbles.push(bubble);
+        $('#procCard').classList.remove('on');openScrim(false);
+        $('#recbtn').disabled=false;
+        renderDesk();
+        const el=$(`.bubble[data-id="${bubble.id}"]`);
+        if(el&&!reducedMotion()){el.classList.add('pop-in');setTimeout(()=>el.classList.remove('pop-in'),800);}
+        toast('新灵感已凝成泡泡');
+      },
+      onError(p){
+        throw new Error(p.stage||'summarizing');
+      }
+    });
+  }catch(err){
+    const localStage=STAGE_MAP[err.message]||'summary';
+    setStep(localStage,'fail','失败');
+    await wait(300);
+    $('#procCard').classList.remove('on');
+    openError(localStage);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   6. 错误态（含重试 / 手动输入）
+   ══════════════════════════════════════════════════════════════ */
+const ERROR_INFO={
+  upload:{t:'音频上传失败',s:'网络中断或文件超出 25MB 限制，本地录音已保留'},
+  transcribe:{t:'语音转写服务超时',s:'转写服务暂时无响应，你可以重试或手动输入文本'},
+  summary:{t:'大模型总结失败',s:'JSON 解析在一次重试后仍失败，原始转写已保留'},
+  permission:{t:'无法使用麦克风',s:'麦克风权限被拒绝，请在浏览器设置中开启，或手动输入'}
+};
+function openError(stage){
+  const info=ERROR_INFO[stage]||ERROR_INFO.summary;
+  openScrim(true);
+  $('#modal').classList.add('on');
+  $('#modalContent').innerHTML=`
+    <div class="error-card">
+      <div class="eic">${svg('warn',24)}</div>
+      <div class="reason-t">${info.t}</div>
+      <div class="reason-s">${info.s}</div>
+      <textarea class="manual-input" id="manualInput" placeholder="也可以直接在这里输入你的灵感……"></textarea>
+      <div class="btnrow">
+        <button class="btn ghost flex" id="errManual" type="button">${svg('pencil',16)}用文本生成</button>
+        <button class="btn primary flex" id="errRetry" type="button">${svg('retry',16)}重试</button>
+      </div>
+    </div>`;
+  trapFocus($('#modal'));
+  $('#errRetry').onclick=()=>{
+    $('#modal').classList.remove('on');
+    if(stage==='permission'){startRecording();return;}
+    runProcess();
+  };
+  $('#errManual').onclick=async()=>{
+    const txt=$('#manualInput').value.trim();
+    if(!txt){toast('请先输入内容');return;}
+    const btn=$('#errManual');
+    btn.disabled=true;btn.innerHTML='<span class="spin"></span>生成中';
+    try{
+      const r=await fetch('/api/ideas/from-text',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({text:txt})
+      }).then(r=>r.json());
+      if(r.code!==0)throw new Error(r.message||'生成失败');
+      $('#modal').classList.remove('on');openScrim(false);$('#recbtn').disabled=false;
+      const bubble=r.data.bubble;
+      bubbles.push(bubble);
+      renderDesk();
+      const el=$(`.bubble[data-id="${bubble.id}"]`);
+      if(el&&!reducedMotion()){el.classList.add('pop-in');setTimeout(()=>el.classList.remove('pop-in'),800);}
+      toast('已根据文本生成泡泡');
+    }catch(err){
+      toast(err.message||'生成失败');
+      btn.disabled=false;btn.innerHTML=svg('pencil',16)+'用文本生成';
+    }
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   7. 泡泡详情
+   ══════════════════════════════════════════════════════════════ */
+function formatDateTime(iso){
+  const d=new Date(iso);
+  const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function openDetail(id){
+  const b=bubbles.find(x=>x.id===id);if(!b)return;
+  lastFocused=document.activeElement;
+  openScrim(true);$('#modal').classList.add('on');
+  $('#modalContent').innerHTML=`
+    <div class="m-hd">
+      <span class="logo" style="width:24px;height:24px"></span>
+      <h3>${b.title}</h3>
+      <button class="xbtn" id="mClose" aria-label="关闭">${svg('x',16)}</button>
+    </div>
+    <div class="m-body">
+      <p class="idea">${b.content}</p>
+      <div class="chips">${b.tags.map(t=>`<span>#${t}</span>`).join('')}</div>
+      <div class="meta-row"><span class="num">${formatDateTime(b.createdAt)}</span><span>来源：${b.origin==='fusion'?'融合':b.origin==='text'?'文本':'语音'}</span></div>
+      <details class="transcript">
+        <summary>${svg('quotes',15)}查看原始口述转写</summary>
+        <div class="tx">${b.source}</div>
+      </details>
+      <div class="btnrow" style="margin-top:14px">
+        <button class="btn burst flex" id="dBurst" type="button">${svg('bolt',16)}灵感爆发</button>
+        <button class="btn primary flex" id="dArch" type="button">${svg('pkg',16)}归档装罐</button>
+      </div>
+    </div>`;
+  trapFocus($('#modal'));
+  $('#mClose').onclick=()=>closeModal();
+  $('#dBurst').onclick=()=>requestAssoc(b);
+  $('#dArch').onclick=()=>doArchive(b);
+}
+function closeModal(){
+  $('#modal').classList.remove('on');openScrim(false);
+  if(lastFocused&&lastFocused.focus)lastFocused.focus();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   8. 归档（含未分类兜底）
+   ══════════════════════════════════════════════════════════════ */
+async function doArchive(b){
+  let resp;
+  try{
+    resp=await fetch(`/api/bubbles/${b.id}/archive`,{method:'POST'}).then(r=>r.json());
+  }catch{ toast('归档失败，请稍后再试'); return; }
+  closeModal();
+  if(resp.code===202){
+    b.unclassified=true;
+    renderDesk();
+    toast('分类暂未完成，稍后可重试');
+    return;
+  }
+  if(resp.code!==0){ toast(resp.message||'归档失败'); return; }
+  bubbles=bubbles.filter(x=>x.id!==b.id);
+  const j=await fetch('/api/jars').then(r=>r.json());
+  if(j.code===0)jars=j.data;
+  renderDesk();renderCabinet();
+  toast(resp.data.isNewJar?'已装入新罐':'已并入主题罐');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   9. 灵感爆发：关联分析 → 候选确认 / 无候选
+   ══════════════════════════════════════════════════════════════ */
+async function requestAssoc(b){
+  let resp;
+  try{
+    resp=await fetch(`/api/bubbles/${b.id}/associate`,{method:'POST'}).then(r=>r.json());
+  }catch{ toast('关联分析失败，请稍后再试'); return; }
+  if(resp.code!==0){ toast(resp.message||'关联分析失败'); return; }
+  /* 后端 dimScores → 前端候选 dim */
+  const cands=(resp.data.candidates||[]).map(c=>({
+    targetId:c.targetId,
+    total:c.total,
+    reason:c.reason,
+    dim:c.dimScores,
+  }));
+  if(cands.length)showCandidates(b,cands);
+  else showNoCand(b);
+}
+function findTargetTitle(id){
+  const b=bubbles.find(x=>x.id===id);
+  return b?b.title:id;
+}
+function showCandidates(b,cands){
+  openScrim(true);$('#modal').classList.add('on');
+  $('#modalContent').innerHTML=`
+    <div class="m-hd"><h3>关联分析完成（${cands.length} 个达标）</h3>
+      <button class="xbtn" id="mClose" aria-label="关闭">${svg('x',16)}</button></div>
+    ${cands.map(c=>`
+      <div class="cand">
+        <div class="c-hd"><span class="ct">${findTargetTitle(c.targetId)}</span>
+          <span class="score num">${c.total}</span></div>
+        <div class="dim">
+          <span class="d">语义相似度 <b class="num">${c.dim.semantic}</b></span>
+          <span class="d">标签重合 <b class="num">${c.dim.tag}</b></span>
+          <span class="d">主题重合 <b class="num">${c.dim.topic}</b></span>
+          <span class="d">关键词 <b class="num">${c.dim.keyword}</b></span>
+        </div>
+        <div class="reason"><b>关联依据：</b>${c.reason}${c.fromJar?'（来源：橱柜）':''}</div>
+      </div>`).join('')}
+    <div class="btnrow" style="margin-top:8px">
+      <button class="btn ghost flex" id="cCancel" type="button">取消</button>
+      <button class="btn burst flex" id="cConfirm" type="button">${svg('bolt',16)}确认爆发</button>
+    </div>`;
+  trapFocus($('#modal'));
+  $('#mClose').onclick=()=>{closeModal();};
+  $('#cCancel').onclick=()=>{closeModal();toast('已取消，数据未变化');};
+  $('#cConfirm').onclick=()=>{
+    closeModal();
+    runBurst(b,cands);
+  };
+}
+function showNoCand(b){
+  openScrim(true);$('#modal').classList.add('on');
+  $('#modalContent').innerHTML=`
+    <div class="no-cand">
+      <div class="nic">${svg('warn',24)}</div>
+      <p>关联分析完成<br>当前没有联系足够紧密的灵感<br>先继续记录或归档</p>
+      <div class="btnrow">
+        <button class="btn flex" disabled type="button">${svg('bolt',16)}灵感爆发</button>
+      </div>
+      <div class="btnrow" style="margin-top:10px">
+        <button class="btn primary flex" id="ncClose" type="button">关闭</button>
+      </div>
+    </div>`;
+  trapFocus($('#modal'));
+  $('#ncClose').onclick=()=>closeModal();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   10. 爆发动画层（桌面/橱柜双来源飞行 + 粒子）
+   ══════════════════════════════════════════════════════════════ */
+function relPos(el){
+  const app=$('#app').getBoundingClientRect(),r=el.getBoundingClientRect();
+  return {x:r.left-app.left+r.width/2,y:r.top-app.top+r.height/2};
+}
+async function runBurst(base,cands){
+  const layer=$('#burstLayer');
+  layer.classList.add('on');
+  $('#burstResult').classList.remove('show');
+  $('#brTitle').textContent='';$('#brSub').textContent='';
+
+  const cx=$('#app').clientWidth/2,cy=$('#app').clientHeight/2;
+
+  /* 起点：桌面泡泡取其元素，橱柜候选取对应罐子 */
+  const starts=cands.map(c=>{
+    if(c.fromJar){
+      const jarEl=$(`.jar[data-id="${c.fromJar}"]`);
+      return jarEl?relPos(jarEl):{x:cx,y:cy+120};
+    }
+    const el=$(`.bubble[data-id="${c.targetId}"]`);
+    return el?relPos(el):{x:cx,y:cy-100};
+  });
+  const baseEl=$(`.bubble[data-id="${base.id}"]`);
+  if(baseEl)starts.unshift(relPos(baseEl));
+
+  /* 飞行克隆：玻璃小球，left/top 直接定位中心，无 transform 以便 GSAP 接管 */
+  const flyers=starts.map(p=>{
+    const f=document.createElement('div');
+    f.style.cssText=`position:absolute;left:${p.x-22}px;top:${p.y-22}px;width:44px;height:44px;
+      border-radius:50%;border:1px solid rgba(255,255,255,.35);z-index:2;
+      background:
+        radial-gradient(circle at 32% 30%,rgba(255,255,255,.6),rgba(255,255,255,0) 42%),
+        radial-gradient(circle at 62% 66%,#b8a4e8,#5a44a0);
+      box-shadow:0 8px 18px rgba(0,0,0,.5)`;
+    layer.appendChild(f);return f;
+  });
+
+  if(reducedMotion()){
+    flyers.forEach(f=>f.remove());
+  }else if(hasGSAP()){
+    /* GSAP：.85s power2.inOut + stagger .12（对齐文档第 6 节）*/
+    await gsap.to(flyers,{
+      x:i=>cx-starts[i].x,
+      y:i=>cy-starts[i].y,
+      scale:.4,opacity:.9,duration:.85,ease:'power2.inOut',stagger:.12
+    });
+  }else{
+    await Promise.all(flyers.map((f,i)=>f.animate([
+      {transform:'scale(1)',opacity:1},
+      {transform:`translate(${cx-starts[i].x}px,${cy-starts[i].y}px) scale(.4)`,opacity:.9}
+    ],{duration:850,easing:'cubic-bezier(.22,.75,.3,1)',fill:'forwards'}).finished));
+  }
+  flyers.forEach(f=>f.remove());
+
+  /* 粒子爆发 */
+  await burstParticles(cx,cy);
+
+  /* 调后端融合：真实新 idea + 同事务落库 */
+  let result;
+  try{
+    result=await callFuse(base,cands);
+  }catch(err){
+    layer.classList.remove('on');
+    renderDesk();
+    toast(err.message||'融合失败，请稍后再试');
+    return;
+  }
+  $('#brTitle').textContent=result.title;
+  $('#brSub').textContent=result.tags.map(t=>'#'+t).join(' ');
+  if(reducedMotion()){
+    /* 稳定态，无需动画 */
+  }else if(hasGSAP()){
+    gsap.fromTo('#burstResult',{scale:0},{scale:1,duration:.8,ease:'back.out(1.7)'});
+  }else{
+    $('#burstResult').classList.add('show');
+  }
+
+  /* 本地同步：移除参与方、加入融合泡泡，刷新橱柜 */
+  const removeIds=new Set([base.id,...cands.map(c=>c.targetId)]);
+  bubbles=bubbles.filter(x=>!removeIds.has(x.id));
+  bubbles.push(result);
+  const jResp=await fetch('/api/jars').then(r=>r.json());
+  if(jResp.code===0)jars=jResp.data;
+
+  await wait(reducedMotion()?200:1400);
+  layer.classList.remove('on');
+  if(hasGSAP())gsap.killTweensOf('#burstResult');
+  $('#burstResult').style.transform='';
+  renderDesk();renderCabinet();
+  toast('融合新灵感已诞生');
+}
+/* 调后端融合接口：基于 base+targets 生成稳定幂等键，返回真实融合 bubble */
+async function callFuse(base,cands){
+  const targetIds=cands.map(c=>c.targetId);
+  const idem='fuse:'+base.id+':'+targetIds.slice().sort().join(',');
+  const resp=await fetch(`/api/bubbles/${base.id}/fuse`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Idempotency-Key':idem},
+    body:JSON.stringify({targetIds}),
+  }).then(r=>r.json());
+  if(resp.code!==0)throw new Error(resp.message||'融合失败');
+  return resp.data.bubble;
+}
+
+/* Canvas 粒子 + 冲击波（130 粒子，六色+琥珀，微重力衰减，自动回收）*/
+let burstRAF;
+async function burstParticles(cx,cy){
+  const canvas=$('#burstCanvas');
+  const dpr=devicePixelRatio||1;
+  canvas.width=$('#app').clientWidth*dpr;canvas.height=$('#app').clientHeight*dpr;
+  const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  const PAL=[...HUE_HEX,'#e8b86d'];
+  if(reducedMotion()){
+    ctx.strokeStyle='rgba(232,184,109,.8)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(cx,cy,40,0,Math.PI*2);ctx.stroke();
+    return;
+  }
+  const particles=Array.from({length:130},()=>{
+    const a=Math.random()*Math.PI*2,s=Math.random()*5+1.5;
+    return {x:cx,y:cy,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,
+      size:Math.random()*3+1.5,color:PAL[Math.floor(Math.random()*PAL.length)]};
+  });
+  let ring=0;
+  return new Promise(resolve=>{
+    function frame(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ring+=4;
+      ctx.strokeStyle='rgba(232,184,109,'+Math.max(0,1-ring/160)+')';ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(cx,cy,ring,0,Math.PI*2);ctx.stroke();
+      let alive=false;
+      particles.forEach(p=>{
+        p.x+=p.vx;p.y+=p.vy;p.vy+=.05;p.life-=.016;
+        if(p.life>0){alive=true;
+          ctx.fillStyle=p.color;
+          ctx.globalAlpha=Math.max(0,p.life);
+          ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
+          ctx.globalAlpha=1;}
+      });
+      if(alive&&ring<170)burstRAF=requestAnimationFrame(frame);
+      else{cancelAnimationFrame(burstRAF);resolve();}
+    }
+    frame();
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   11. 罐子详情
+   ══════════════════════════════════════════════════════════════ */
+async function openJar(id){
+  lastFocused=document.activeElement;
+  openScrim(true);$('#modal').classList.add('on');
+  $('#modalContent').innerHTML='<div style="text-align:center;padding:30px;color:var(--ink-dim)">加载中…</div>';
+  let detail;
+  try{
+    const r=await fetch(`/api/jars/${id}`).then(r=>r.json());
+    detail=r.data;
+  }catch{
+    $('#modal').classList.remove('on');openScrim(false);
+    toast('罐子详情加载失败');return;
+  }
+  if(!detail){closeModal();toast('罐子不存在');return;}
+  const list=detail.bubbles||[];
+  $('#modalContent').innerHTML=`
+    <div class="jar-detail-hero">
+      <div class="jarbox">${jarSVG(list.length,detail.theme)}</div>
+      <h3>${detail.theme}</h3>
+      <div class="jc num">${list.length} SPARKS COLLECTED</div>
+    </div>
+    <div class="spark-list">
+      ${list.map(b=>`<button type="button" class="sp" data-spid="${b.id}"><span class="pd"></span>
+        <div><div class="st">${b.title}</div><div class="ss">${b.content.slice(0,30)}${b.content.length>30?'…':''}</div></div></button>`).join('')}
+    </div>
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn primary flex" id="jClose" type="button">关闭</button>
+    </div>`;
+  trapFocus($('#modal'));
+  $('#jClose').onclick=()=>closeModal();
+  $$('.spark-list .sp',$('#modalContent')).forEach(btn=>{
+    const target=list.find(x=>x.id===btn.dataset.spid);
+    btn.onclick=()=>openArchivedBubble(target);
+  });
+}
+
+/* 罐内灵感只读详情：数据直接来自罐子详情，不依赖本地 bubbles */
+function openArchivedBubble(b){
+  if(!b)return;
+  openScrim(true);$('#modal').classList.add('on');
+  $('#modalContent').innerHTML=`
+    <div class="m-hd">
+      <span class="logo" style="width:24px;height:24px"></span>
+      <h3>${b.title}</h3>
+      <button class="xbtn" id="mClose" aria-label="关闭">${svg('x',16)}</button>
+    </div>
+    <div class="m-body">
+      <p class="idea">${b.content}</p>
+      <div class="chips">${b.tags.map(t=>`<span>#${t}</span>`).join('')}</div>
+      <div class="meta-row"><span class="num">${formatDateTime(b.createdAt)}</span><span>来源：${b.origin==='fusion'?'融合':b.origin==='text'?'文本':'语音'}</span></div>
+      <details class="transcript">
+        <summary>${svg('quotes',15)}查看原始口述转写</summary>
+        <div class="tx">${b.source}</div>
+      </details>
+      <div class="btnrow" style="margin-top:14px">
+        <button class="btn primary flex" id="aClose" type="button">关闭</button>
+      </div>
+    </div>`;
+  trapFocus($('#modal'));
+  $('#mClose').onclick=()=>closeModal();
+  $('#aClose').onclick=()=>closeModal();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   12. 全局事件
+   ══════════════════════════════════════════════════════════════ */
+$('#recbtn').onclick=()=>startRecording();
+$('#emptyRec').onclick=()=>startRecording();
+$('#scrim').onclick=()=>{
+  /* 处理面板/录音面板打开时不允许遮罩关闭；仅 modal 半屏可遮罩关闭 */
+  if($('#procCard').classList.contains('on')||$('#recCard').classList.contains('on'))return;
+  closeModal();
+};
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  if($('#procCard').classList.contains('on')||$('#recCard').classList.contains('on'))return;
+  if($('#modal').classList.contains('on'))closeModal();
+});
+$('#btnSound').onclick=()=>{
+  soundOn=!soundOn;
+  $('#soundIc').outerHTML=svg(soundOn?'speakerHi':'speakerX',19)
+    .replace('class="ic"','class="ic" id="soundIc"');
+  $('#btnSound').setAttribute('aria-pressed',String(soundOn));
+  toast(soundOn?'音效已开启':'音效已关闭');
+};
+
+/* ══════════════════════════════════════════════════════════════
+   13. 关键屏声明（截图器枚举）
+   ══════════════════════════════════════════════════════════════ */
+window.__UI_CAPTURE__={
+  reset:async()=>{
+    $('#burstLayer').classList.remove('on');
+    $('#recCard').classList.remove('on');$('#procCard').classList.remove('on');
+    $('#recbtn').disabled=false;
+    $('#recbtn').classList.remove('recording');
+    recState='idle';
+    closeModal();
+  },
+  states:[
+    {id:'home',label:'主界面'},
+    {id:'recording',label:'录音面板',go:async()=>startRecording()},
+    {id:'paused',label:'暂停态',go:async()=>{await startRecording();$('#btnPause').click();}},
+    {id:'processing',label:'处理流程',go:async()=>{
+      await startRecording();await wait(1200);$('#btnFinish').click();}},
+    {id:'detail',label:'泡泡详情',go:async()=>openDetail('b1')},
+    {id:'candidate',label:'候选确认',go:async()=>{
+      openDetail('b1');await wait(100);$('#dBurst').click();await wait(1300);}},
+    {id:'nocand',label:'无候选提示',go:async()=>{
+      openDetail('b7');await wait(100);$('#dBurst').click();await wait(1300);}},
+    {id:'jardetail',label:'罐子详情',go:async()=>openJar('j1')},
+    {id:'error',label:'错误态',go:async()=>openError('transcribe')},
+    {id:'burst',label:'爆发动画',go:async()=>{
+      openDetail('b1');await wait(200);$('#dBurst').click();
+      await wait(1300);$('#cConfirm').click();}}
+  ]};
+
+/* 初始化：从服务端加载持久化数据后再渲染 */
+async function bootstrap(){
+  try{
+    const [bResp,jResp]=await Promise.all([
+      fetch('/api/bubbles?status=desk').then(r=>r.json()),
+      fetch('/api/jars').then(r=>r.json()),
+    ]);
+    if(bResp.code===0&&Array.isArray(bResp.data))bubbles=bResp.data;
+    if(jResp.code===0&&Array.isArray(jResp.data))jars=jResp.data;
+  }catch(err){
+    console.warn('服务端数据加载失败，使用空数据启动',err);
+  }
+  renderDesk();renderCabinet();
+}
+bootstrap();
+$('#soundIc').outerHTML=svg('speakerHi',19).replace('class="ic"','class="ic" id="soundIc"');
+</script>
+</body>
+</html>
