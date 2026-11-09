@@ -37,6 +37,20 @@ export function createBubbleRouter(repo) {
     }
   });
 
+  /* 删除单个泡泡 */
+  router.delete('/:id', async (req, res, next) => {
+    try {
+      const bubble = await repo.getBubble(req.params.id);
+      if (!bubble) {
+        return res.status(404).json({ code: 404, data: null, message: 'bubble not found' });
+      }
+      const result = await repo.deleteBubble(bubble.id);
+      res.json({ code: 0, data: { deleted: result.deleted }, message: 'ok' });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   /* 归档装罐：分类 → 归一 → 并罐/建罐；分类失败 202 并标记 unclassified */
   router.post('/:id/archive', async (req, res, next) => {
     try {

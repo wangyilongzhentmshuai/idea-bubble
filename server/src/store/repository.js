@@ -114,6 +114,8 @@ export function createRepository(db) {
       INSERT INTO fusion_records(id, result_bubble_id, participant_ids, created_at)
       VALUES (?, ?, ?, ?)
     `),
+    deleteBubble: db.prepare(`DELETE FROM bubbles WHERE id = ?`),
+    deleteJar: db.prepare(`DELETE FROM jars WHERE id = ?`),
   };
 
   return {
@@ -264,6 +266,24 @@ export function createRepository(db) {
       });
       apply();
       return mapBubble(stmts.getBubble.get(resultBubble.id));
+    },
+
+    async deleteBubble(id) {
+      const info = stmts.deleteBubble.run(id);
+      return { deleted: info.changes };
+    },
+
+    /* 级联删除：事务内先删罐内全部泡泡，再删罐子 */
+    async deleteJarCascade(id) {
+      const jarBubbles = stmts.listJarBubbles.all(id);
+      const apply = db.transaction(() => {
+        for (const b of jarBubbles) {
+          stmts.deleteBubble.run(b.id);
+        }
+        stmts.deleteJar.run(id);
+      });
+      apply();
+      return { deletedBubbles: jarBubbles.length };
     },
   };
 }
