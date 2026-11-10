@@ -14,6 +14,15 @@ fs.mkdirSync(config.paths.audioDir, { recursive: true });
 const db = openDb(config.paths.dbFile);
 const repo = createRepository(db);
 
+/* 启动恢复：上次中断残留的"整理中"泡泡统一标记失败，避免永久挂起 */
+const stale = await repo.listProcessingBubbles();
+for (const b of stale) {
+  await repo.failBubbleProcessing(b.id);
+}
+if (stale.length) {
+  console.log(`[recover] ${stale.length} 个未完成泡泡已标记失败`);
+}
+
 const app = express();
 app.use(
   cors({

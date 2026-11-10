@@ -1,14 +1,16 @@
 import path from 'node:path';
 import { config } from '../config.js';
 import { newId } from '../utils/ids.js';
-import { writeSse } from '../utils/sse.js';
 import { transcribe } from './asr.js';
 import { jsonObjectChat } from './ark.js';
-import { buildBubble } from './bubble-factory.js';
+import { buildPendingBubble } from './bubble-factory.js';
 import { loadSummaryPrompt } from './prompts.js';
 import { summarySchema } from '../utils/schemas.js';
 
-export async function runAudioPipeline({ res, repo, file, duration, mime }) {
+const clampTitle = (title) => Array.from(String(title ?? '')).slice(0, 16).join('');
+
+/* 快速落库：建 recording + 整理中占位泡泡，不调用方舟 */
+export async function createPendingIdea({ repo, file, duration, mime }) {
   const now = new Date().toISOString();
   const recordingId = newId('r');
   const storedAudioPath = path.relative(config.paths.serverRoot, file.path);
@@ -22,41 +24,37 @@ export async function runAudioPipeline({ res, repo, file, duration, mime }) {
     createdAt: now,
   });
 
-  writeSse(res, 'stage', { stage: 'uploading', progress: 100 });
+  const bubble = await buildPendingBubble(repo, { recordingId });
+  await repo.addBubbleOnly(bubble);
 
-  /* 阶段一：语音转写 */
-  writeSse(res, 'stage', { stage: 'transcribing' });
+  return { recordingId, bubble };
+}
+
+/* 后台处理：转写 → 总结 → 更新占位泡泡；任一步失败置失败态并保留录音 */
+export async function processPendingIdea({
+  repo,
+  recordingId,
+  bubbleId,
+  filePath,
+  mime,
+}) {
   let transcript;
   try {
-    transcript = await transcribe(file.path, mime);
+    transcript = await transcribe(filePath, mime);
   } catch (err) {
-    const code = err.code || 'ASR_FAILED';
-    await repo.markRecordingFailed(recordingId, code);
-    writeSse(res, 'error', {
-      stage: 'transcribing',
-      code,
-      message: err.message || '语音转写失败',
-    });
-    res.end();
+    await repo.markRecordingFailed(recordingId, err.code || 'ASR_FAILED');
+    await repo.failBubbleProcessing(bubbleId);
     return;
   }
 
   if (!transcript) {
     await repo.markRecordingFailed(recordingId, 'ASR_EMPTY');
-    writeSse(res, 'error', {
-      stage: 'transcribing',
-      code: 'ASR_EMPTY',
-      message: '未识别到有效语音内容',
-    });
-    res.end();
+    await repo.failBubbleProcessing(bubbleId);
     return;
   }
 
-  /* 转写成功即持久化，后续总结失败也不丢 transcript */
   await repo.markRecordingTranscribed(recordingId, transcript);
 
-  /* 阶段二：大模型总结 */
-  writeSse(res, 'stage', { stage: 'summarizing' });
   let summary;
   try {
     const system = await loadSummaryPrompt();
@@ -68,27 +66,15 @@ export async function runAudioPipeline({ res, repo, file, duration, mime }) {
       ],
     });
   } catch (err) {
-    const code = err.code || 'SUMMARY_FAILED';
-    await repo.markRecordingFailed(recordingId, code);
-    writeSse(res, 'error', {
-      stage: 'summarizing',
-      code,
-      message: err.message || '灵感总结失败',
-    });
-    res.end();
+    await repo.markRecordingFailed(recordingId, err.code || 'SUMMARY_FAILED');
+    await repo.failBubbleProcessing(bubbleId);
     return;
   }
 
-  const bubble = await buildBubble(repo, {
-    summary,
+  await repo.finishBubbleProcessing(bubbleId, {
+    title: clampTitle(summary.title),
+    content: summary.content,
+    tags: summary.tags,
     source: transcript,
-    origin: 'voice',
-    recordingId,
   });
-
-  await repo.addBubbleOnly(bubble);
-
-  const recording = await repo.getRecording(recordingId);
-  writeSse(res, 'done', { recording, bubble });
-  res.end();
 }

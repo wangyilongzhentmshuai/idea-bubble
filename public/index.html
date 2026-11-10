@@ -186,6 +186,15 @@ body::after{content:"";position:fixed;inset:0;z-index:9999;pointer-events:none;o
 .bubble.pop-in{animation:popin .7s cubic-bezier(.22,1.4,.36,1) both}
 @keyframes popin{from{transform:scale(0)}to{transform:scale(1)}}
 
+/* 整理中 / 失败泡泡 */
+.bubble.pending{cursor:default}
+.bubble.pending .t{font-size:12.5px}
+.bubble .pending-tag{display:inline-flex;align-items:center;gap:5px;color:var(--amber-soft)}
+.bubble .mini-spin{width:11px;height:11px;border:1.6px solid rgba(232,184,109,.3);
+  border-top-color:var(--amber);border-radius:50%;animation:rot .8s linear infinite}
+.bubble.failed{border-color:var(--c-coral)}
+.bubble .fail-tag{color:var(--c-coral);font-weight:700}
+
 /* 空状态 */
 .empty{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
   justify-content:center;gap:10px;text-align:center;padding:20px}
@@ -659,15 +668,21 @@ function renderDesk(){
   const list=bubbles.filter(b=>b.status==='desk');
   list.forEach((b,i)=>{
     const el=document.createElement('button');
-    el.type='button';el.className='bubble'+(b.unclassified?' unclassified':'');
+    el.type='button';
+    el.className='bubble'+(b.unclassified?' unclassified':'')+
+      (b.processing===1?' pending':b.processing===2?' failed':'');
     el.style.setProperty('--hue','var('+HUE_VARS[i%6]+')');
     const size=118+(i%3)*10;
     el.style.width=size+'px';el.style.height=size+'px';
     el.style.left=b.x+'%';el.style.top=b.y+'%';el.dataset.id=b.id;
     el.setAttribute('aria-label','查看灵感 '+b.title);
-    el.innerHTML=`<span class="t">${b.title}</span>`+
-      (b.unclassified?'<span class="uc">未分类</span>':`<span class="tag">${b.tags[0]}</span>`);
-    el.onclick=()=>openDetail(b.id);
+    let badge;
+    if(b.processing===1)badge='<span class="tag pending-tag"><i class="mini-spin"></i>整理中</span>';
+    else if(b.processing===2)badge='<span class="tag fail-tag">处理失败</span>';
+    else if(b.unclassified)badge='<span class="uc">未分类</span>';
+    else badge=`<span class="tag">${b.tags[0]||'灵感'}</span>`;
+    el.innerHTML=`<span class="t">${b.title}</span>`+badge;
+    el.onclick=()=>{if(b.processing===1)return;openDetail(b.id);};
     desk.appendChild(el);
   });
   desk.classList.toggle('is-empty',list.length===0);
@@ -802,92 +817,71 @@ function setStep(name,state,label){
   else{el.classList.remove('active','done','fail');si.innerHTML=`<span class="num">${name==='upload'?1:name==='transcribe'?2:3}</span>`;}
   if(label)el.querySelector('.sp').textContent=label;
 }
-/* 唯一网络出口：提交音频并解析 SSE */
-const STAGE_MAP={uploading:'upload',transcribing:'transcribe',summarizing:'summary'};
+/* 网络出口：提交音频，后端立即返回"整理中"占位泡泡，处理在后台进行 */
 const API={
-  async submitAudio(blob,duration,handlers){
+  async submitAudio(blob,duration){
     const fd=new FormData();
     fd.append('audio',blob,'idea.webm');
     fd.append('duration',String(duration));
     const resp=await fetch('/api/ideas/from-audio',{method:'POST',body:fd});
-    if(!resp.ok||!resp.body){
-      let message='音频上传失败';
-      try{const j=await resp.json();if(j.message)message=j.message;}catch{}
-      handlers.onError({stage:'uploading',code:'UPLOAD_FAILED',message});
-      return;
+    const j=await resp.json().catch(()=>null);
+    if(!resp.ok||!j||j.code!==0){
+      const e=new Error((j&&j.message)||'音频上传失败');
+      e.code=resp.status===413?'LIMIT_FILE_SIZE':'UPLOAD_FAILED';
+      throw e;
     }
-    const reader=resp.body.getReader();
-    const decoder=new TextDecoder();
-    let buffer='';
-    while(true){
-      const {done,value}=await reader.read();
-      if(done)break;
-      buffer+=decoder.decode(value,{stream:true});
-      let sep;
-      while((sep=buffer.indexOf('\n\n'))>=0){
-        const frame=buffer.slice(0,sep);
-        buffer=buffer.slice(sep+2);
-        dispatchFrame(frame,handlers);
-      }
-    }
+    return j.data.bubble;
   }
 };
-function dispatchFrame(frame,handlers){
-  let event='message';const dataLines=[];
-  for(const line of frame.split('\n')){
-    if(line.startsWith('event:'))event=line.slice(6).trim();
-    else if(line.startsWith('data:'))dataLines.push(line.slice(5).trim());
-  }
-  const payload=JSON.parse(dataLines.join('\n'));
-  if(event==='stage')handlers.onStage(payload);
-  else if(event==='done')handlers.onDone(payload);
-  else if(event==='error')handlers.onError(payload);
-}
 
 async function runProcess(){
   $('#procCard').classList.add('on');
-  $('#procBar').style.width='0%';
-  ['upload','transcribe','summary'].forEach(s=>setStep(s,'idle'));
-
+  $('#procBar').style.width='15%';
+  setStep('upload','active','上传中');
   try{
-    await API.submitAudio(lastAudioBlob,lastAudioDuration,{
-      onStage(p){
-        if(p.stage==='uploading'){
-          setStep('upload','active','上传中');
-          $('#procBar').style.width=(p.progress||0)+'%';
-        }else if(p.stage==='transcribing'){
-          setStep('upload','done','已完成');
-          setStep('transcribe','active','转写中');
-          $('#procBar').style.width='50%';
-        }else if(p.stage==='summarizing'){
-          setStep('transcribe','done','已完成');
-          setStep('summary','active','总结中');
-          $('#procBar').style.width='75%';
-        }
-      },
-      async onDone({bubble}){
-        setStep('summary','done','已完成');
-        $('#procBar').style.width='100%';
-        await wait(reducedMotion()?40:300);
-        bubbles.push(bubble);
-        $('#procCard').classList.remove('on');openScrim(false);
-        $('#recbtn').disabled=false;
-        renderDesk();
-        const el=$(`.bubble[data-id="${bubble.id}"]`);
-        if(el&&!reducedMotion()){el.classList.add('pop-in');setTimeout(()=>el.classList.remove('pop-in'),800);}
-        toast('新灵感已凝成泡泡');
-      },
-      onError(p){
-        throw new Error(p.stage||'summarizing');
-      }
-    });
+    const bubble=await API.submitAudio(lastAudioBlob,lastAudioDuration);
+    bubbles.push(bubble);
+    $('#procCard').classList.remove('on');openScrim(false);
+    $('#recbtn').disabled=false;
+    renderDesk();
+    const el=$(`.bubble[data-id="${bubble.id}"]`);
+    if(el&&!reducedMotion()){el.classList.add('pop-in');setTimeout(()=>el.classList.remove('pop-in'),800);}
+    toast('已收录，AI 正在后台整理');
+    startPolling();
   }catch(err){
-    const localStage=STAGE_MAP[err.message]||'summary';
-    setStep(localStage,'fail','失败');
+    setStep('upload','fail','失败');
     await wait(300);
     $('#procCard').classList.remove('on');
-    openError(localStage);
+    openError('upload');
   }
+}
+
+/* 轮询：后台处理完成后更新"整理中"泡泡；没有处理中泡泡时自动停止 */
+let pollTimer=null;
+function startPolling(){
+  if(pollTimer)return;
+  pollTimer=setInterval(pollTick,3500);
+  pollTick();
+}
+async function pollTick(){
+  const hasPending=bubbles.some(b=>b.processing===1);
+  if(!hasPending){
+    if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+    return;
+  }
+  try{
+    const r=await fetch('/api/bubbles?status=desk').then(r=>r.json());
+    if(r.code!==0)return;
+    let changed=false;
+    r.data.forEach(remote=>{
+      const local=bubbles.find(x=>x.id===remote.id);
+      if(local&&local.processing!==remote.processing){
+        Object.assign(local,remote);
+        changed=true;
+      }
+    });
+    if(changed)renderDesk();
+  }catch{}
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1447,6 +1441,7 @@ async function bootstrap(){
     console.warn('服务端数据加载失败，使用空数据启动',err);
   }
   renderDesk();renderCabinet();
+  if(bubbles.some(b=>b.processing===1))startPolling();
 }
 bootstrap();
 $('#soundIc').outerHTML=svg('speakerHi',19).replace('class="ic"','class="ic" id="soundIc"');

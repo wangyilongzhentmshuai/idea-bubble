@@ -14,6 +14,7 @@ function mapBubble(row) {
     recordingId: row.recording_id,
     origin: row.origin,
     unclassified: row.unclassified === 1,
+    processing: row.processing ?? 0,
     schemaVersion: row.schema_version,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -80,9 +81,9 @@ export function createRepository(db) {
     addBubble: db.prepare(`
       INSERT INTO bubbles(
         id, title, content, tags, status, source, x, y, color,
-        jar_id, recording_id, origin, unclassified, schema_version, created_at, updated_at
+        jar_id, recording_id, origin, unclassified, processing, schema_version, created_at, updated_at
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
     `),
     countBubbles: db.prepare(`SELECT COUNT(*) AS n FROM bubbles`),
@@ -116,6 +117,15 @@ export function createRepository(db) {
     `),
     deleteBubble: db.prepare(`DELETE FROM bubbles WHERE id = ?`),
     deleteJar: db.prepare(`DELETE FROM jars WHERE id = ?`),
+    finishBubble: db.prepare(`
+      UPDATE bubbles
+      SET title = ?, content = ?, tags = ?, source = ?, processing = 0, updated_at = ?
+      WHERE id = ?
+    `),
+    failBubble: db.prepare(`
+      UPDATE bubbles SET processing = 2, updated_at = ? WHERE id = ?
+    `),
+    listProcessing: db.prepare(`SELECT * FROM bubbles WHERE processing = 1`),
   };
 
   return {
@@ -189,6 +199,7 @@ export function createRepository(db) {
         bubble.recordingId ?? null,
         bubble.origin,
         bubble.unclassified ? 1 : 0,
+        bubble.processing ?? 0,
         bubble.schemaVersion,
         bubble.createdAt,
         bubble.updatedAt
@@ -253,6 +264,7 @@ export function createRepository(db) {
           resultBubble.recordingId ?? null,
           resultBubble.origin,
           resultBubble.unclassified ? 1 : 0,
+          resultBubble.processing ?? 0,
           resultBubble.schemaVersion,
           resultBubble.createdAt,
           resultBubble.updatedAt
@@ -284,6 +296,30 @@ export function createRepository(db) {
       });
       apply();
       return { deletedBubbles: jarBubbles.length };
+    },
+
+    /* 后台处理成功：写入真实内容并置完成 */
+    async finishBubbleProcessing(id, { title, content, tags, source }) {
+      stmts.finishBubble.run(
+        title,
+        content,
+        JSON.stringify(tags),
+        source,
+        new Date().toISOString(),
+        id
+      );
+      return mapBubble(stmts.getBubble.get(id));
+    },
+
+    /* 后台处理失败：置失败态，录音保留 */
+    async failBubbleProcessing(id) {
+      stmts.failBubble.run(new Date().toISOString(), id);
+      return mapBubble(stmts.getBubble.get(id));
+    },
+
+    /* 启动恢复用：列出所有仍在处理中的泡泡 */
+    async listProcessingBubbles() {
+      return stmts.listProcessing.all().map(mapBubble);
     },
   };
 }

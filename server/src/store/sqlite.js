@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export function openDb(dbFile) {
   fs.mkdirSync(path.dirname(dbFile), { recursive: true });
@@ -55,6 +55,8 @@ function migrate(db) {
       origin         TEXT NOT NULL DEFAULT 'voice'
                      CHECK (origin IN ('voice', 'text', 'fusion')),
       unclassified   INTEGER NOT NULL DEFAULT 0,
+      processing     INTEGER NOT NULL DEFAULT 0
+                     CHECK (processing IN (0, 1, 2)),
       schema_version INTEGER NOT NULL DEFAULT 1,
       created_at     TEXT NOT NULL,
       updated_at     TEXT NOT NULL
@@ -82,8 +84,18 @@ function migrate(db) {
     );
   `);
 
-  const row = db.prepare(`SELECT value FROM schema_meta WHERE key = 'schemaVersion'`).get();
-  if (!row) {
-    db.prepare(`INSERT INTO schema_meta(key, value) VALUES ('schemaVersion', ?)`).run(String(SCHEMA_VERSION));
+  /* v2：老库补 processing 列（0 完成 / 1 整理中 / 2 失败）*/
+  const cols = db.prepare(`PRAGMA table_info(bubbles)`).all();
+  if (!cols.some((c) => c.name === 'processing')) {
+    db.exec(`
+      ALTER TABLE bubbles
+      ADD COLUMN processing INTEGER NOT NULL DEFAULT 0
+      CHECK (processing IN (0, 1, 2))
+    `);
   }
+
+  db.prepare(`
+    INSERT INTO schema_meta(key, value) VALUES ('schemaVersion', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(String(SCHEMA_VERSION));
 }

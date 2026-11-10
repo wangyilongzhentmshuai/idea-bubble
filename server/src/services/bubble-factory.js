@@ -42,3 +42,28 @@ export async function buildBubble(
     updatedAt: now,
   };
 }
+
+/* 构建"整理中"占位泡泡：录音落盘后立即创建，后台完成后再更新内容 */
+export async function buildPendingBubble(repo, { recordingId }) {
+  const now = new Date().toISOString();
+  const seq = (await repo.countBubbles()) + 1;
+  return {
+    id: newId('b'),
+    title: '灵感整理中…',
+    content: '语音已收录，AI 正在整理，稍后即可查看',
+    tags: [],
+    status: 'desk',
+    source: null,
+    x: round1(4 + Math.random() * 58),
+    y: round1(4 + Math.random() * 56),
+    color: BUBBLE_HUES[(seq - 1) % BUBBLE_HUES.length],
+    jarId: null,
+    recordingId,
+    origin: 'voice',
+    unclassified: false,
+    processing: 1,
+    schemaVersion: 1,
+    createdAt: now,
+    updatedAt: now,
+  };
+}

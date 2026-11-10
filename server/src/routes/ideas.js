@@ -4,8 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { config } from '../config.js';
 import { newId } from '../utils/ids.js';
-import { sseHeaders, writeSse } from '../utils/sse.js';
-import { runAudioPipeline } from '../services/pipeline.js';
+import { createPendingIdea, processPendingIdea } from '../services/pipeline.js';
 import { jsonObjectChat, ArkError } from '../services/ark.js';
 import { buildBubble } from '../services/bubble-factory.js';
 import { loadSummaryPrompt } from '../services/prompts.js';
@@ -97,8 +96,8 @@ export function createIdeaRouter(repo) {
     }
   });
 
-  router.post('/from-audio', (req, res, next) => {
-    upload.single('audio')(req, res, (err) => {
+  router.post('/from-audio', (req, res) => {
+    upload.single('audio')(req, res, async (err) => {
       if (err) {
         if (req.file && req.file.path) {
           fs.rmSync(req.file.path, { force: true });
@@ -121,41 +120,35 @@ export function createIdeaRouter(repo) {
           .status(400)
           .json({ code: 400, data: null, message: '缺少 audio 文件字段' });
       }
-      streamPipeline(req, res).catch(next);
+
+      let bubble;
+      try {
+        const result = await createPendingIdea({
+          repo,
+          file: req.file,
+          duration: Number(req.body.duration) || 0,
+          mime: req.file.mimetype,
+        });
+        bubble = result.bubble;
+        res.json({ code: 0, data: { bubble }, message: 'ok' });
+      } catch (e) {
+        fs.rmSync(req.file.path, { force: true });
+        console.error('[create pending error]', e);
+        return res
+          .status(500)
+          .json({ code: 500, data: null, message: 'internal server error' });
+      }
+
+      /* 响应已返回，后台异步处理，不阻塞下一次录音 */
+      processPendingIdea({
+        repo,
+        recordingId: bubble.recordingId,
+        bubbleId: bubble.id,
+        filePath: req.file.path,
+        mime: req.file.mimetype,
+      }).catch((e) => console.error('[background process error]', e));
     });
   });
-
-  async function streamPipeline(req, res) {
-    sseHeaders(res);
-    req.on('close', () => {
-      // 客户端断开：已落盘音频与 recording 保留，不做删除
-    });
-    try {
-      await runAudioPipeline({
-        res,
-        repo,
-        file: req.file,
-        duration: Number(req.body.duration) || 0,
-        mime: req.file.mimetype,
-      });
-    } catch (err) {
-      console.error('[pipeline error]', err);
-      if (res.headersSent) {
-        writeSse(res, 'error', {
-          stage: 'summary',
-          code: 'PIPELINE_ERROR',
-          message: '灵感处理失败，请重试',
-        });
-        res.end();
-      } else {
-        res.status(500).json({
-          code: 500,
-          data: null,
-          message: 'internal server error',
-        });
-      }
-    }
-  }
 
   return router;
 }
